@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulado Cesgranrio - Área da Educação</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        h1 { color: #667eea; text-align: center; margin-bottom: 10px; font-size: 28px; }
+        h2 { color: #333; margin-bottom: 20px; text-align: center; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; }
+        input[type="email"], input[type="password"], input[type="text"] {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; font-size: 16px; transition: border-color 0.3s;
+        }
+        input:focus { outline: none; border-color: #667eea; }
+        .btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s; margin-top: 10px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .info-box {
+            background: #f8f9fa; border-left: 4px solid #667eea;
+            padding: 15px; margin: 20px 0; border-radius: 4px;
+        }
+        .info-box p { color: #555; line-height: 1.6; }
+        .admin-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e0e0e0;
+        }
+        .admin-header h2 { margin: 0; text-align: left; }
+        .logout-btn {
+            padding: 8px 16px; background: #e74c3c; color: white;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
+        }
+        .access-denied { text-align: center; padding: 40px; }
+        .access-denied h2 { color: #e74c3c; }
+        .quiz-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 30px; border-radius: 12px;
+            margin: 20px 0; text-align: center;
+        }
+        .quiz-info h3 { font-size: 24px; margin-bottom: 10px; color: white; }
+        .quiz-info p { font-size: 16px; opacity: 0.9; }
+        .error-message {
+            background: #fee; color: #c33; padding: 10px; border-radius: 6px;
+            margin-bottom: 15px; display: none; border-left: 4px solid #c33;
+        }
+        .error-message.show { display: block; }
+        .success-message {
+            background: #d4edda; color: #155724; padding: 10px; border-radius: 6px;
+            margin-bottom: 15px; display: none; border-left: 4px solid #155724;
+        }
+        .success-message.show { display: block; }
+        .loading { text-align: center; padding: 20px; color: #666; }
+        .spinner {
+            border: 3px solid #f3f3f3; border-top: 3px solid #667eea;
+            border-radius: 50%; width: 30px; height: 30px;
+            animation: spin 1s linear infinite; margin: 0 auto 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .link-text { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+        .link-text a { color: #667eea; text-decoration: none; font-weight: 600; }
+        .link-text a:hover { text-decoration: underline; }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 22px; }
+            .admin-header { flex-direction: column; gap: 15px; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Tela de Cadastro -->
+        <div id="registerScreen" class="screen active">
+            <h1>📚 Simulado Cesgranrio</h1>
+            <p class="subtitle">Área da Educação - 50 Questões</p>
+            <div class="info-box">
+                <p><strong>Bem-vindo!</strong> Para acessar o simulado, é necessário realizar o cadastro com seu email. Após o cadastro, aguarde a aprovação do administrador.</p>
+            </div>
+            <div id="registerError" class="error-message"></div>
+            <div id="registerSuccess" class="success-message"></div>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="registerEmail">Email:</label>
+                    <input type="email" id="registerEmail" required placeholder="seu.email@exemplo.com">
+                </div>
+                <button type="submit" class="btn" id="registerBtn">Cadastrar</button>
+            </form>
+            <p class="link-text">
+                Já tem cadastro? <a href="#" onclick="showLogin()">Fazer login</a>
+            </p>
+        </div>
+
+        <!-- Tela de Login -->
+        <div id="loginScreen" class="screen">
+            <h1>📚 Simulado Cesgranrio</h1>
+            <p class="subtitle">Área da Educação</p>
+            <div id="loginError" class="error-message"></div>
+            <div id="loginLoading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Verificando acesso...</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email:</label>
+                    <input type="email" id="loginEmail" required placeholder="seu.email@exemplo.com">
+                </div>
+                <button type="submit" class="btn" id="loginBtn">Entrar</button>
+            </form>
+            <p class="link-text">
+                Não tem cadastro? <a href="#" onclick="showRegister()">Cadastrar</a>
+            </p>
+        </div>
+
+        <!-- Tela de Acesso Negado -->
+        <div id="accessDeniedScreen" class="screen">
+            <div class="access-denied">
+                <h2>⏳ Acesso Pendente</h2>
+                <p style="margin: 20px 0; color: #666;">Seu cadastro está aguardando aprovação do administrador.</p>
+                <p style="color: #999; font-size: 14px;">Você receberá uma notificação quando seu acesso for liberado.</p>
+                <button class="btn btn-secondary" onclick="showLogin()" style="margin-top: 30px;">Voltar ao Login</button>
+            </div>
+        </div>
+
+        <!-- Tela do Simulado (após aprovação) -->
+        <div id="quizScreen" class="screen">
+            <div class="admin-header">
+                <h2>📚 Simulado Cesgranrio</h2>
+                <button class="logout-btn" onclick="logout()">Sair</button>
+            </div>
+            <div class="quiz-info">
+                <h3>Simulado Pronto!</h3>
+                <p>50 questões contextualizadas • Múltipla escolha (A–E)</p>
+            </div>
+            <div class="info-box">
+                <p><strong>Baseado em:</strong> LDB, BNCC, PNE, ECA, LBI e autores clássicos.</p>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #666; margin-bottom: 20px;">O simulado está pronto para iniciar</p>
+                <button class="btn" onclick="iniciarSimulado()">Iniciar Simulado</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // ⚠️ CONFIGURAÇÃO DO FIREBASE - SUBSTITUA COM SEUS DADOS
+        // =====================================================
+        const firebaseConfig = {
+            apiKey: "COLE_SUA_API_KEY_AQUI",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO_ID",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+
+        const ADMIN_PASSWORD = 'Atlanta';
+        const USERS_COLLECTION = 'users';
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // =====================================================
+        // LÓGICA DA APLICAÇÃO
+        // =====================================================
+        const CURRENT_USER_KEY = 'simulado_current_user';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarUsuarioLogado();
+        });
+
+        function verificarUsuarioLogado() {
+            const currentUser = localStorage.getItem(CURRENT_USER_KEY);
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                verificarAcessoUsuario(user.email);
+            }
+        }
+
+        async function verificarAcessoUsuario(email) {
+            try {
+                const emailNormalizado = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const docRef = db.collection(USERS_COLLECTION).doc(emailNormalizado);
+                const doc = await docRef.get();
+                if (doc.exists) {
+                    const userData = doc.data();
+                    if (userData.approved) {
+                        mostrarTela('quizScreen');
+                    } else {
+                        mostrarTela('accessDeniedScreen');
+                    }
+                } else {
+                    mostrarTela('registerScreen');
+                }
+            } catch (error) {
+                console.error('Erro ao verificar acesso:', error);
+                mostrarErro('loginError', 'Erro ao verificar acesso. Tente novamente.');
+            }
+        }
+
+        function mostrarTela(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showLogin() { mostrarTela('loginScreen'); limparMensagens(); }
+        function showRegister() { mostrarTela('registerScreen'); limparMensagens(); }
+
+        function limparMensagens() {
+            document.querySelectorAll('.error-message, .success-message').forEach(msg => msg.classList.remove('show'));
+        }
+
+        function mostrarErro(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.classList.add('show');
+        }
+
+        function mostrarSucesso(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.classList.add('show');
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            limparMensagens();
+            const email = document.getElementById('registerEmail').value.trim().toLowerCase();
+            const registerBtn = document.getElementById('registerBtn');
+
+            if (!email) { mostrarErro('registerError', 'Por favor, insira um email válido'); return; }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) { mostrarErro('registerError', 'Por favor, insira um email válido'); return; }
+
+            registerBtn.disabled = true;
+            registerBtn.textContent = 'Cadastrando...';
+
+            try {
+                const emailNormalizado = email.replace(/[^a-z0-9]/g, '_');
+                const docRef = db.collection(USERS_COLLECTION).doc(emailNormalizado);
+                const doc = await docRef.get();
+
+                if (doc.exists) {
+                    mostrarErro('registerError', 'Este email já está cadastrado');
+                    registerBtn.disabled = false;
+                    registerBtn.textContent = 'Cadastrar';
+                    return;
+                }
+
+                await docRef.set({
+                    email: email,
+                    approved: false,
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                mostrarSucesso('registerSuccess', 'Cadastro realizado com sucesso! Aguarde a aprovação do administrador.');
+                setTimeout(() => {
+                    document.getElementById('registerForm').reset();
+                    showLogin();
+                }, 2000);
+            } catch (error) {
+                console.error('Erro ao cadastrar:', error);
+                mostrarErro('registerError', 'Erro ao cadastrar. Tente novamente.');
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Cadastrar';
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            limparMensagens();
+            const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+            const loginBtn = document.getElementById('loginBtn');
+            const loadingDiv = document.getElementById('loginLoading');
+
+            if (!email) { mostrarErro('loginError', 'Por favor, insira um email válido'); return; }
+
+            loginBtn.disabled = true;
+            loadingDiv.style.display = 'block';
+
+            try {
+                const emailNormalizado = email.replace(/[^a-z0-9]/g, '_');
+                const docRef = db.collection(USERS_COLLECTION).doc(emailNormalizado);
+                const doc = await docRef.get();
+
+                if (!doc.exists) {
+                    mostrarErro('loginError', 'Email não encontrado. Por favor, cadastre-se primeiro.');
+                    loginBtn.disabled = false;
+                    loadingDiv.style.display = 'none';
+                    return;
+                }
+
+                const userData = doc.data();
+                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({ email: email, approved: userData.approved }));
+
+                if (userData.approved) {
+                    mostrarTela('quizScreen');
+                } else {
+                    mostrarTela('accessDeniedScreen');
+                }
+            } catch (error) {
+                console.error('Erro ao fazer login:', error);
+                mostrarErro('loginError', 'Erro ao fazer login. Tente novamente.');
+            } finally {
+                loginBtn.disabled = false;
+                loadingDiv.style.display = 'none';
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem(CURRENT_USER_KEY);
+            mostrarTela('registerScreen');
+            limparMensagens();
+            document.getElementById('registerForm').reset();
+            document.getElementById('loginForm').reset();
+        }
+
+        function iniciarSimulado() {
+            window.location.href = 'quiz.html';
+        }
+    </script>
+</body>
+</html>

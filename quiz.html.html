@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulado - 50 Questões</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        h1 { color: #667eea; text-align: center; margin-bottom: 10px; font-size: 28px; }
+        h2 { color: #333; margin-bottom: 20px; text-align: center; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .admin-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e0e0e0;
+        }
+        .admin-header h2 { margin: 0; text-align: left; }
+        .logout-btn {
+            padding: 8px 16px; background: #e74c3c; color: white;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
+        }
+        .access-denied { text-align: center; padding: 40px; }
+        .access-denied h2 { color: #e74c3c; }
+        .quiz-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 30px; border-radius: 12px;
+            margin: 20px 0; text-align: center;
+        }
+        .quiz-info h3 { font-size: 24px; margin-bottom: 10px; color: white; }
+        .quiz-info p { font-size: 16px; opacity: 0.9; }
+        .info-box {
+            background: #f8f9fa; border-left: 4px solid #667eea;
+            padding: 15px; margin: 20px 0; border-radius: 4px;
+        }
+        .info-box p { color: #555; line-height: 1.6; }
+        .btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s; margin-top: 10px;
+            text-decoration: none; display: inline-block;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .loading { text-align: center; padding: 20px; color: #666; }
+        .spinner {
+            border: 3px solid #f3f3f3; border-top: 3px solid #667eea;
+            border-radius: 50%; width: 30px; height: 30px;
+            animation: spin 1s linear infinite; margin: 0 auto 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 22px; }
+            .admin-header { flex-direction: column; gap: 15px; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Verificação de acesso -->
+        <div id="accessCheck" class="screen active">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Verificando seu acesso...</p>
+            </div>
+        </div>
+
+        <!-- Tela do Simulado -->
+        <div id="quizScreen" class="screen">
+            <div class="admin-header">
+                <h2>📚 Simulado Cesgranrio</h2>
+                <button class="logout-btn" onclick="logout()">Sair</button>
+            </div>
+            <div class="quiz-info">
+                <h3>Simulado em Andamento</h3>
+                <p>Questão <span id="currentQuestion">1</span> de 50</p>
+            </div>
+            <div id="questionContainer" style="margin: 30px 0;">
+                <div class="info-box">
+                    <p><strong>Observação:</strong> Esta é a estrutura do simulado. As 50 questões devem ser adicionadas nesta página.</p>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #666; margin-bottom: 20px;">Bom estudo!</p>
+                <button class="btn" onclick="verRespostas()">Ver Respostas</button>
+            </div>
+        </div>
+
+        <!-- Acesso negado -->
+        <div id="noAccessScreen" class="screen">
+            <div class="access-denied">
+                <h2>🚫 Acesso Negado</h2>
+                <p style="margin: 20px 0; color: #666;">Você não tem permissão para acessar o simulado.</p>
+                <p style="color: #999; font-size: 14px;">Faça seu cadastro e aguarde a aprovação do administrador.</p>
+                <a href="index.html" class="btn" style="margin-top: 30px;">Ir para Cadastro</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // ⚠️ CONFIGURAÇÃO DO FIREBASE - SUBSTITUA COM SEUS DADOS
+        // =====================================================
+        const firebaseConfig = {
+            apiKey: "COLE_SUA_API_KEY_AQUI",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO_ID",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+
+        const USERS_COLLECTION = 'users';
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // =====================================================
+        // LÓGICA DO SIMULADO
+        // =====================================================
+        const CURRENT_USER_KEY = 'simulado_current_user';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarAcessoSimulado();
+        });
+
+        async function verificarAcessoSimulado() {
+            const currentUser = localStorage.getItem(CURRENT_USER_KEY);
+            
+            if (!currentUser) {
+                mostrarTela('noAccessScreen');
+                return;
+            }
+
+            const user = JSON.parse(currentUser);
+
+            try {
+                const emailNormalizado = user.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const docRef = db.collection(USERS_COLLECTION).doc(emailNormalizado);
+                const doc = await docRef.get();
+
+                if (doc.exists && doc.data().approved) {
+                    mostrarTela('quizScreen');
+                    carregarSimulado();
+                } else {
+                    mostrarTela('noAccessScreen');
+                }
+            } catch (error) {
+                console.error('Erro ao verificar acesso:', error);
+                mostrarTela('noAccessScreen');
+            }
+        }
+
+        function mostrarTela(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function carregarSimulado() {
+            console.log('Simulado carregado com sucesso!');
+        }
+
+        function logout() {
+            localStorage.removeItem(CURRENT_USER_KEY);
+            window.location.href = 'index.html';
+        }
+
+        function verRespostas() {
+            alert('Funcionalidade de ver respostas será implementada com as 50 questões.');
+        }
+    </script>
+</body>
+</html>
