@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Coleção "solicitacoes": 1 documento por e-mail (ID do doc = e-mail em minúsculas)
+// Campos: { email: string, status: "pending" | "approved" | "rejected", criadoEm: timestamp }
+//
+// Regra de ouro: qualquer pessoa pode CRIAR seu próprio pedido de acesso (status inicial
+// obrigatoriamente "pending"), qualquer pessoa pode LER (só para saber o próprio status),
+// mas só um administrador AUTENTICADO no Firebase Auth pode ATUALIZAR (aprovar/recusar)
+// ou APAGAR (revogar) um pedido. Isso é o que impede alguém de aprovar o próprio e-mail
+// direto pelo console do navegador, mesmo burlando a tela de senha do site.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /solicitacoes/{emailId} {
+
+      allow read: if true;
+
+      allow create: if request.resource.data.status == 'pending'
+                    && request.resource.data.email is string
+                    && request.resource.data.email.lower() == emailId
+                    && request.resource.data.keys().hasOnly(['email', 'status', 'criadoEm']);
+
+      allow update, delete: if request.auth != null;
+    }
+  }
+}
